@@ -1,0 +1,289 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Adldap\Laravel\Facades\Adldap;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Contracts\Encryption\DecryptException;
+use App\User;
+use App\Student;
+use App\Staff;
+
+class AdauthController extends Controller
+{
+    /**
+     * SessionsController constructor.
+     */
+    public function __construct()
+    {
+//        $this->middleware('guest', ['except' => ['destroy', 'test', 'loginforce']]);
+    }
+
+    function test()
+    {
+        $this->authorize('view', ['121']);
+        dd('ok');
+
+        if (auth()->check()) {
+            dd('login');
+        } else {
+            dd('not login');
+        }
+
+		$username="sfs.hrdbadmin";
+		$password="djEmals03!4";
+
+
+        // Finding a user.
+        $user = Adldap::search()->users()->find('dongwook');
+        $user = Adldap::search()->users()->find('Koh, Dongwook (IT)');
+//dd($user);
+
+        // Searching for a user.
+        $search = Adldap::search()->where('cn', '=', 'Koh, Dongwook (IT)')->get();
+//dd($search);
+
+        // Authenticating against your LDAP server.
+//        if (Adldap::auth()->attempt($username, $password)) {
+//            dd('passed');
+//        } else {
+//            dd('not passed');
+//        }
+
+        // Authenticating against your LDAP server.
+        if (Auth::attempt(['username' => $username, 'password' => $password])) {
+            // Passed!
+            $user = \Auth::user();
+            dd($user);
+
+        } else {
+            dd('not passed');
+        }
+
+        // Running an operation under a different connection:
+        $users = Adldap::getProvider('other-connection')->search()->users()->get();
+
+        // Creating a user.
+        $user = Adldap::make()->user([
+            'cn' => 'John Doe',
+        ]);
+//        $user->save();
+    }
+
+    /**
+     * Show the application login form.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create(Request $request, $from = null, $returl = null)
+    {
+        // ws에는 로그인이 되어 있는데, hrdb에 로그인이 풀린 경우 대비.
+        if (Auth::check()) {
+            $returl = $request->input('returl');
+            $from = $request->input('from');
+
+            $this->old_login(auth()->user()); // old 쿠키 생성
+
+            if ($from) {
+                if ($from == 'hrdb') {
+                    $returl = "https://hrdb.sfs.or.kr" . urldecode($returl);
+                } elseif ($from == 'webservice') {
+                    $returl = "https://webservice.sfs.or.kr" . urldecode($returl);
+                } elseif ($from == 'students') {
+                    $returl = "https://students.sfs.or.kr" . urldecode($returl);
+                }
+            } else {
+                if ($returl) {
+                    try {
+                        $returl = decrypt($returl);
+                    } catch (DecryptException $e) {
+                        $returl = null;
+                    }
+                } else {
+                    $returl = redirect()->intended('/', 301, [], true)->getTargetUrl();
+                    $returl = str_replace('http://', 'https://', $returl);
+                }
+
+            }
+            return redirect()->secure($returl);
+        }
+
+
+        if (!$returl) {
+            $returl = $request->input('returl');
+        }
+
+        if (!$from) {
+            $from = $request->input('from');
+        }
+        return view('adauth.adminlte_create')->with(
+            compact('returl', 'from')
+        );
+    }
+
+    /**
+     * Handle login request to the application.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     */
+    public function store(Request $request)
+    {
+//        dd($request->all());
+
+        $this->validate($request, [
+            'loginid' => 'required',
+            'loginpw' => 'required',
+        ]);
+
+        // Authenticating against your LDAP server.
+        if (auth()->attempt(['username' => $request->input('loginid'), 'password' => $request->input('loginpw')])) {
+//            $user = auth()->user();
+//            \Log::alert($user);
+
+            $this->old_login(auth()->user()); // old 쿠키 생성
+
+            $from = $request->input('from');
+            $returl = $request->input('returl');
+            if ($from) {
+                if ($from == 'hrdb') {
+                    $returl = "https://hrdb.sfs.or.kr" . urldecode($returl);
+                } elseif ($from == 'webservice') {
+                    $returl = "https://webservice.sfs.or.kr" . urldecode($returl);
+                } elseif ($from == 'students') {
+                    $returl = "https://students.sfs.or.kr" . urldecode($returl);
+                }
+            } else {
+                if ($returl) {
+                    try {
+                        $returl = decrypt($returl);
+                    } catch (DecryptException $e) {
+                        $returl = null;
+                    }
+                } else {
+                    $returl = redirect()->intended('/', 301, [], true)->getTargetUrl();
+                    $returl = str_replace('http://', 'https://', $returl);
+                }
+
+            }
+            return redirect()->secure($returl);
+        } else {
+            return back()->withInput()->withErrors(['message' => "Invalid ID or password. Please try again your SFS ID."]);
+        }
+    }
+
+    /**
+     * Log the user out of the application.
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     */
+    public function destroy(Request $request, $returl = null)
+    {
+//        dd($request->all());
+
+        auth()->logout();
+        setcookie('hrdbAuth', '', time() - 86400, "/", ".sfs.or.kr");
+        setcookie('hrdbAN', '', time() - 86400, "/", ".sfs.or.kr");
+
+        $from = $request->input('from');
+        if ($from) {
+            if ($from == 'hrdb') {
+                $returl = "https://hrdb.sfs.or.kr/";
+            } elseif ($from == 'webservice') {
+                $returl = "https://webservice.sfs.or.kr/";
+            } elseif ($from == 'students') {
+                $returl = "https://students.sfs.or.kr/";
+            } else {
+                $returl = "https://hrdb.sfs.or.kr/";
+            }
+            return redirect()->secure($returl);
+        }
+
+        if ($returl) {
+            try {
+                $returl = decrypt($returl);
+            } catch (DecryptException $e) {
+                $returl = null;
+            }
+        } else {
+            $returl = null;
+        }
+
+        if ($returl) { // 외부사이트에 넘어오는것을 대비해서
+            return redirect($returl);
+        } else {
+            return redirect(route('index'));
+        }
+    }
+
+    public function old_login($user)
+    {
+        // 기존사이트의 SSO를 위해서 쿠키생성
+        $enTxt = "";
+
+        $staffInfo = Staff::where('staffid', $user->staffid)
+//            ->where('isvalid', 1)
+            ->select('staffid', 'lastname', 'firstname')
+            ->first();
+
+        if ($staffInfo) {
+            $idtype = "staff";
+            $staffid = $staffInfo->staffid;
+            $displayname = $staffInfo->lastname . ", " . $staffInfo->firstname;
+            $accountname = "";
+            $enTxt = encodeStaffid($staffid, $displayname, "hrdbAuth", $accountname, $idtype);
+
+        } else {
+            $studentList = Student::where('studentid', $user->staffid)
+//                ->where('isvalid', 1)
+                ->select('studentid', 'st_lastname', 'st_firstname')
+                ->first();
+            if ($studentList) {
+                $idtype = "student";
+                $studentid = $studentList->studentid;
+                $displayname = $studentList->st_lastname . ", " . $studentList->st_firstname;
+                $accountname = "";
+
+                $enTxt = encodeStaffid($studentid, $displayname, "hrdbAuth", $accountname, $idtype);
+            } else {
+            }
+        }
+        if ($enTxt) {
+            if ($idtype == 'staff') {
+                \Log::info("make Cooke for old HRDB. staffid = " . $staffInfo->staffid);
+            } elseif ($idtype == 'student') {
+                \Log::info("make Cooke for old HRDB. studentid = " . $studentList->studentid);
+            } else {
+                \Log::info("make Cooke for old HRDB. Unknown idtype");
+            }
+
+        } else {
+            \Log::critical("It fail to make Cookie for old HRDB");
+        }
+
+        return true;
+    }
+
+    public function loginforce($staffid = 0, $retsite = "") {
+        if (!$staffid) return "NO STAFFID";
+
+        if ($this->authorize('isadmin', [])) {
+            // 로그인 처리하면 됨
+            $user = User::where('staffid', $staffid)->first();
+            if ($user) {
+                Auth::login($user);
+                $this->old_login($user); // old 쿠키 생성
+
+                if ($retsite == 'hrdb') {
+                    return redirect(url('https://hrdb.sfs.or.kr'));
+                } else {
+                    return redirect(route('index'));
+                }
+
+            } else {
+                return "NO USER";
+            }
+        }
+    }
+}
