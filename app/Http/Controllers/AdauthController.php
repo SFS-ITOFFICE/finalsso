@@ -115,9 +115,6 @@ class AdauthController extends Controller
                 }
             }
             if (! $returl) $returl = "https://seoulforeignorg.finalsite.com/";
-
-            dd($returl);
-
             return redirect()->secure($returl);
         } else {
             return back()->withInput()->withErrors(['message' => "Invalid ID or password. Please try again your SFS ID."]);
