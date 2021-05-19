@@ -42,9 +42,9 @@ return [
     'sp' => [
         // Base64 encoded ACS URL
         '' => [ // finalsite 는 AssertionConsumerServiceURL 값을 AuthnRequest 에서 넘겨주지 않아서 base64 값이 빈값이다.
-            'destination' => 'https://seoulforeignorg.finalsite.com/integration/saml/ACS.cfm',
-            'logout' => 'https://seoulforeignorg.finalsite.com/userlogin.cfm?do=logout',
-            'certificate' => 'https://seoulforeignorg.finalsite.com/userlogin.cfm?do=logout',
+            'destination' => 'https://www.seoulforeign.org/integration/saml/ACS.cfm',
+            'logout' => 'https://www.seoulforeign.org/userlogin.cfm?do=logout',
+            'certificate' => 'https://www.seoulforeign.org/userlogin.cfm?do=logout',
         ],
 
         'aHR0cHM6Ly9zZW91bGZvcmVpZ25vcmcuZmluYWxzaXRlLmNvbS9pbnRlZ3JhdGlvbi9zYW1sL0FDUy5jZm0=' => [ // 정상일때는 이 배열..

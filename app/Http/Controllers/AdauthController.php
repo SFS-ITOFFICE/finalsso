@@ -114,7 +114,7 @@ class AdauthController extends Controller
                     $returl = str_replace('http://', 'https://', $returl);
                 }
             }
-            if (! $returl) $returl = "https://seoulforeignorg.finalsite.com/";
+            if (! $returl) $returl = "https://www.seoulforeign.org/";
             return redirect()->secure($returl);
         } else {
             return back()->withInput()->withErrors(['message' => "Invalid ID or password. Please try again your SFS ID."]);
@@ -143,7 +143,7 @@ class AdauthController extends Controller
             } elseif ($from == 'students') {
                 $returl = "https://students.sfs.or.kr/";
             } else {
-                $returl = "https://seoulforeignorg.finalsite.com/";
+                $returl = "https://www.seoulforeign.org/";
             }
             return redirect()->secure($returl);
         }
