@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Adldap\Laravel\Facades\Adldap;
 use Auth;
+use Hash;
+use App\Models\User;
+use App\Models\Staff;
+use App\Models\Student;
 
 class AdauthController extends Controller
 {
@@ -27,11 +31,12 @@ class AdauthController extends Controller
         // Finding a user.
         $user = Adldap::search()->users()->find('dongwook');
         $user = Adldap::search()->users()->find('Koh, Dongwook (IT)');
-//dd($user);
+        $user = Adldap::search()->users()->find($username);
+dd($user);
 
         // Searching for a user.
-        $search = Adldap::search()->where('cn', '=', 'Koh, Dongwook (IT)')->get();
-//dd($search);
+        $search = Adldap::search()->where('sAMAccountName', '=', $username)->get();
+dd($search);
 
         // Authenticating against your LDAP server.
         if (Adldap::auth()->attempt($username, $password)) {
@@ -66,6 +71,8 @@ class AdauthController extends Controller
 
     public function create(Request $request, $from = null, $returl = null)
     {
+        //dd($request->input('loginid'));
+
         if (!$returl) {
             $returl = $request->input('returl');
         }
@@ -87,38 +94,48 @@ class AdauthController extends Controller
             'loginpw' => 'required',
         ]);
 
-        // Authenticating against your LDAP server.
-        if (auth()->attempt(['username' => $request->input('loginid'), 'password' => $request->input('loginpw')])) {
-//            $user = auth()->user();
-//            \Log::alert($user);
+        $loginid = $request->input('loginid');
+        $loginpw = $request->input('loginpw');
+        if (Adldap::auth()->attempt($loginid, $loginpw)) { // LDAP 에 아이디/암호로 확인한다.
+            $password = Hash::make($loginpw);
+            $staffid = 0;
+            $name = 'Unknown';
 
-            $from = $request->input('from');
-            $returl = $request->input('returl');
-            if ($from) {
-                if ($from == 'hrdb') {
-                    $returl = "https://hrdb.sfs.or.kr" . urldecode($returl);
-                } elseif ($from == 'webservice') {
-                    $returl = "https://webservice.sfs.or.kr" . urldecode($returl);
-                } elseif ($from == 'students') {
-                    $returl = "https://students.sfs.or.kr" . urldecode($returl);
-                }
+            $_STAFF = Staff::where('accountname', $loginid)->first();
+            if ($_STAFF) {
+                $staffid = $_STAFF->staffid;
+                $name = $_STAFF->fullname;
             } else {
-                if ($returl) {
-                    try {
-                        $returl = decrypt($returl);
-                    } catch (DecryptException $e) {
-                        $returl = null;
-                    }
-                } else {
-                    $returl = redirect()->intended('/', 301, [], true)->getTargetUrl();
-                    $returl = str_replace('http://', 'https://', $returl);
+                $_STUDENT = Student::where('st_accountname', $loginid)->first();
+                if ($_STUDENT) {
+                    $staffid = $_STUDENT->studentid;
+                    $name = $_STUDENT->fullname;
                 }
             }
-            if (! $returl) $returl = "https://www.seoulforeign.org/";
-            return redirect()->secure($returl);
+
+            $_USER = User::where('username', $loginid)->first();
+            if (! $_USER) {
+                $_USER = new User();
+                $_USER->username = $loginid;
+            }
+            $_USER->email = $loginid . "@seoulforeign.org";
+            $_USER->name = ($_USER->name) ?: $name;
+            $_USER->staffid = $staffid;
+            $_USER->password = $password;
+            $_USER->save();
+
+            // Authenticating against your LDAP server.
+            if (auth()->attempt(['username' => $loginid, 'password' => $loginpw])) {
+                $returl = "https://www.seoulforeign.org/";
+                return redirect()->secure($returl);
+            } else {
+                return back()->withInput()->withErrors(['message' => "Invalid ID or password. Please try again your SFS ID."]);
+            }
         } else {
             return back()->withInput()->withErrors(['message' => "Invalid ID or password. Please try again your SFS ID."]);
+
         }
+
     }
 
     /**
