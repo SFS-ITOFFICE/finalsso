@@ -73,6 +73,11 @@ dd($search);
     {
         //dd($request->input('loginid'));
 
+        //if (auth()->check()) {
+        //    dd('login status');
+        //}
+        //auth()->logout();
+
         if (!$returl) {
             $returl = $request->input('returl');
         }
