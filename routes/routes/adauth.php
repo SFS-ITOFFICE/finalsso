@@ -2,8 +2,7 @@
 
 use App\Http\Controllers\AdauthController;
 
-
-https://finalsso.sfs.or.kr/simplesaml/saml2/idp/SSOService.php
+// https://finalsso.sfs.or.kr/simplesaml/saml2/idp/SSOService.php
 
 Route::get('/simplesaml/saml2/idp/SSOService.php', [AdauthController::class, 'create']);
 
